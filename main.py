@@ -8,6 +8,7 @@ import base64
 from dotenv import load_dotenv
 from fpdf import FPDF
 from docx import Document
+import fitz  # PyMuPDF für die PDF-Verarbeitung
 
 # Lade die geheimen Daten aus der .env Datei
 load_dotenv()
@@ -19,26 +20,40 @@ app = FastAPI()
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("outputs", exist_ok=True)
 
-# Wir machen den outputs-Ordner öffentlich, damit die Download-Buttons funktionieren
+# STATISCHE ORDNER FREIGEBEN
+# Damit die Download-Buttons funktionieren:
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+# Damit die index.html auf die style.css zugreifen kann:
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Wenn jemand die Startseite aufruft, schicken wir ihm die HTML-Webseite
+# Startseite: Liefert die index.html aus dem static-Ordner
 @app.get("/")
 def read_root():
     return FileResponse("static/index.html")
 
-# Der Pfad für den Datei-Upload und die Verarbeitung
 @app.post("/upload/")
 async def upload_image(file: UploadFile = File(...)):
-    # 1. Bild im uploads-Ordner speichern
+    # 1. Datei im uploads-Ordner speichern
     file_location = f"uploads/{file.filename}"
     with open(file_location, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # 2. Bild für Google vorbereiten (in Base64 Text umwandeln)
-    with open(file_location, "rb") as image_file:
-        image_content = image_file.read()
+    # 2. PDF-Check & Konvertierung
+    # Falls es ein PDF ist, wandeln wir die erste Seite in ein Bild um
+    if file.filename.lower().endswith('.pdf'):
+        pdf_dokument = fitz.open(file_location)
+        # Wir nehmen die erste Seite (Index 0)
+        erste_seite = pdf_dokument.load_page(0)
+        # Erzeuge ein Bild (Pixmap) der Seite
+        bild_von_seite = erste_seite.get_pixmap()
+        image_content = bild_von_seite.tobytes("png")
         base64_image = base64.b64encode(image_content).decode("utf-8")
+        pdf_dokument.close()
+    else:
+        # Wenn es ein normales Bild ist (jpg/png), direkt einlesen
+        with open(file_location, "rb") as image_file:
+            image_content = image_file.read()
+            base64_image = base64.b64encode(image_content).decode("utf-8")
     
     # 3. Anfrage an Google Vision API senden
     google_url = f"https://vision.googleapis.com/v1/images:annotate?key={API_KEY}"
@@ -59,10 +74,10 @@ async def upload_image(file: UploadFile = File(...)):
     erkannter_text = ""
     try:
         erkannter_text = result["responses"][0]["fullTextAnnotation"]["text"]
-    except KeyError:
-        erkannter_text = "Es konnte kein Text auf dem Bild gefunden werden."
+    except (KeyError, IndexError):
+        erkannter_text = "Es konnte kein Text auf der Datei gefunden werden."
 
-    # 5. Dateinamen für PDF und Word vorbereiten (aus "bild.jpg" wird "bild")
+    # 5. Dateinamen für PDF und Word vorbereiten
     dateiname_ohne_endung = os.path.splitext(file.filename)[0]
     pdf_pfad = f"outputs/{dateiname_ohne_endung}.pdf"
     word_pfad = f"outputs/{dateiname_ohne_endung}.docx"
@@ -71,6 +86,7 @@ async def upload_image(file: UploadFile = File(...)):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", size=12)
+    # Sonderzeichen-Fix für FPDF
     sicherer_text = erkannter_text.encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 10, text=sicherer_text)
     pdf.output(pdf_pfad)
@@ -80,7 +96,7 @@ async def upload_image(file: UploadFile = File(...)):
     doc.add_paragraph(erkannter_text)
     doc.save(word_pfad)
 
-    # 8. Antwort an die Webseite (Frontend) zurückschicken
+    # 8. Antwort an das Frontend zurückgeben
     return {
         "nachricht": "Erfolgreich erkannt und konvertiert!", 
         "dateiname": file.filename,
