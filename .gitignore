@@ -1,0 +1,17 @@
+# macOS spezifisch
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Geheime Schlüssel und Zugangsdaten
+.env
+
+# Editor-Einstellungen (z.B. für VS Code)
+.vscode/
+
+# Unsere zukünftigen Upload- und Download-Ordner (optional, aber praktisch)
+uploads/
+outputs/
