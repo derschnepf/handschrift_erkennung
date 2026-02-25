@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Handschrift zu Text Konverter</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        input[type="file"] {
+            margin: 20px 0;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        #result-box {
+            display: none;
+            margin-top: 30px;
+            text-align: left;
+            border-top: 2px solid #eee;
+            padding-top: 20px;
+        }
+
+        .text-output {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .download-btn {
+            display: inline-block;
+            margin: 10px 10px 0 0;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            background: #28a745;
+            color: white;
+            font-size: 14px;
+        }
+
+        .download-btn.word {
+            background: #17a2b8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>Handschrift erkennen ✍️</h2>
+        <p>Lade dein Bild hoch und wir wandeln es in ein Dokument um.</p>
+
+        <input type="file" id="fileInput" accept="image/*">
+        <br>
+        <button onclick="uploadImage()">Text erkennen & Konvertieren</button>
+        <div id="status"></div>
+
+        <div id="result-box">
+            <h3>Erkannter Text:</h3>
+            <div class="text-output" id="textOutput"></div>
+
+            <h3>Downloads:</h3>
+            <a id="pdfDownload" href="#" class="download-btn" download>📄 PDF Herunterladen</a>
+            <a id="wordDownload" href="#" class="download-btn word" download>📝 Word Herunterladen</a>
+        </div>
+    </div>
+
+    <script>
+        async function uploadImage() {
+            const fileInput = document.getElementById('fileInput');
+            const statusText = document.getElementById('status');
+            const resultBox = document.getElementById('result-box');
+
+            if (fileInput.files.length === 0) {
+                alert("Bitte wähle zuerst ein Bild aus!");
+                return;
+            }
+
+            // UI aktualisieren
+            statusText.innerText = "Verarbeite Bild... Bitte warten ⏳";
+            resultBox.style.display = "none";
+
+            // Bild für den Versand vorbereiten
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                // Anfrage an unser Python-Backend schicken
+                const response = await fetch("/upload/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                // Ergebnisse auf der Webseite anzeigen
+                document.getElementById('textOutput').innerText = data.erkannter_text;
+
+                // Download-Links setzen (Wir setzen einen "/" davor, damit der Browser den Pfad richtig findet)
+                document.getElementById('pdfDownload').href = "/" + data.erstelltes_pdf;
+                document.getElementById('wordDownload').href = "/" + data.erstelltes_word;
+
+                statusText.innerText = "Erfolgreich konvertiert! 🎉";
+                resultBox.style.display = "block";
+
+            } catch (error) {
+                statusText.innerText = "Fehler beim Upload: " + error;
+            }
+        }
+    </script>
+</body>
+
+</html>
