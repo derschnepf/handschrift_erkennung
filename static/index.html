@@ -15,6 +15,11 @@
 
         <input type="file" id="fileInput" accept="image/*, application/pdf">
         <br>
+
+        <input type="text" id="customFileName" placeholder="Eigener Dateiname (optional)"
+            style="margin: 10px 0; padding: 10px; width: 80%; border: 1px solid #ccc; border-radius: 5px;">
+        <br>
+
         <button onclick="uploadImage()">Text erkennen & Konvertieren</button>
         <div id="status"></div>
 
@@ -25,12 +30,17 @@
             <h3>Downloads:</h3>
             <a id="pdfDownload" href="#" class="download-btn" download>📄 PDF Herunterladen</a>
             <a id="wordDownload" href="#" class="download-btn word" download>📝 Word Herunterladen</a>
+
+            <h3 style="margin-top: 30px;">Dokumenten-Vorschau:</h3>
+            <iframe id="pdfPreview" src=""
+                style="width: 100%; height: 400px; border: 1px solid #ccc; border-radius: 5px;"></iframe>
         </div>
     </div>
 
     <script>
         async function uploadImage() {
             const fileInput = document.getElementById('fileInput');
+            const customFileName = document.getElementById('customFileName').value;
             const statusText = document.getElementById('status');
             const resultBox = document.getElementById('result-box');
 
@@ -45,6 +55,10 @@
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
 
+            if (customFileName.trim() !== "") {
+                formData.append("custom_filename", customFileName);
+            }
+
             try {
                 const response = await fetch("/upload/", {
                     method: "POST",
@@ -56,6 +70,7 @@
                 document.getElementById('textOutput').innerText = data.erkannter_text;
                 document.getElementById('pdfDownload').href = "/" + data.erstelltes_pdf;
                 document.getElementById('wordDownload').href = "/" + data.erstelltes_word;
+                document.getElementById('pdfPreview').src = "/" + data.erstelltes_pdf;
 
                 statusText.innerText = "Erfolgreich konvertiert! 🎉";
                 resultBox.style.display = "block";
